@@ -25,13 +25,14 @@ export function Team() {
 
 function Presence() {
   const s = useStore();
+  const [edit, setEdit] = useState<Person | null>(null);
   const t = today();
   const team = s.people.filter(p => p.active && p.role !== 'owner');
   const days = Array.from({ length: 7 }, (_, i) => shiftDay(t, i - 6));
   const [photo, setPhoto] = useState<string | null>(null);
   return (
     <>
-      <Section title="Aujourd'hui">
+      <Section title="Aujourd'hui" aside="« Fiche » pour le salaire et le poste">
         <div class="card list">
           {team.map(p => {
             const a = s.attendance.find(x => x.personId === p.id && x.day === t);
@@ -41,6 +42,7 @@ function Presence() {
                 {a?.photo ? <button class="thumb-b" onClick={() => setPhoto(a.photo!)}><img class="thumb round" src={a.photo} alt={`Photo de ${p.name}`} /></button> : <span class="av sm">{p.name[0]}</span>}
                 <div class="main"><div class="ttl">{p.name} <span class="sub">· {p.job}</span></div>
                   <div class="sub">{a ? <>Arrivée {time(a.inAt)}{a.outAt ? ` · départ ${time(a.outAt)}` : ''} {a.inZone === false ? <Pill k="bad">hors zone</Pill> : a.inZone ? <Pill k="ok">au commerce</Pill> : <Pill>position ?</Pill>}</> : rest ? 'Jour de repos' : 'Pas encore pointé'}</div></div>
+                <button class="btn sm" onClick={() => setEdit(p)}>Fiche</button>
                 <a class="icon-btn" href={waLink(p.phone, `Bonjour ${p.name}, `)} target="_blank" rel="noopener" aria-label={`Écrire à ${p.name}`}><Icon n="chat" size={18} /></a>
               </div>
             );
@@ -61,7 +63,9 @@ function Presence() {
           <div class="legend dark"><span><i class="att-d ok" />À l'heure</span><span><i class="att-d late" />En retard</span><span><i class="att-d abs" />Absent</span><span><i class="att-d rest" />Repos</span></div>
         </div>
       </Section>
+      <button class="btn big" onClick={() => setEdit({ id: '', name: '', job: 'Vendeur', phone: '', role: 'staff', salary: 0, payMethod: 'wave', restDay: 1, active: true })}><Icon n="plus" size={18} /> Ajouter une personne</button>
       {photo && <Sheet title="Photo de pointage" onClose={() => setPhoto(null)}><img class="receipt-img" src={photo} alt="" /></Sheet>}
+      {edit && <PersonSheet p={edit} onClose={() => setEdit(null)} />}
     </>
   );
 }
@@ -113,7 +117,7 @@ function Payroll() {
         <button class="icon-btn" disabled={month >= monthKey(Date.now())} onClick={() => setMonth(prevMonth(month, 1))} aria-label="Mois suivant"><Icon n="right" /></button>
       </div>
       <div class="kpis"><div><span>Masse salariale</span><b class="num">{fmt(total)}</b></div><div><span>Déjà payé</span><b class="num">{fmt(paid)}</b></div><div><span>Reste</span><b class="num">{fmt(total - paid)}</b></div></div>
-      <p class="hint">Les absences viennent du pointage avec photo. Une journée = salaire ÷ 26. Vous pouvez ajuster avant de payer.</p>
+      <p class="hint">Touchez une personne pour définir son salaire, ajuster une prime ou payer. Les absences viennent du pointage avec photo (une journée = salaire ÷ 26).</p>
       <div class="card list">
         {run.lines.map(l => {
           const p = person(l.personId)!;
@@ -122,7 +126,7 @@ function Payroll() {
               <span class="av sm">{p.name[0]}</span>
               <div class="main"><div class="ttl">{p.name} <span class="sub">· {p.job}</span></div>
                 <div class="sub">{fmt(l.base)} F{l.absentDays ? ` · ${l.absentDays} j. absent (−${fmt(l.deduction)})` : ''}{l.advances ? ` · avance −${fmt(l.advances)}` : ''}{l.bonus ? ` · prime +${fmt(l.bonus)}` : ''}</div></div>
-              <div class="amt"><Money v={l.net} />{l.paidAt ? <Pill k="ok">Payé {dateShort(l.paidAt)}</Pill> : <Pill k="warn">À payer</Pill>}</div>
+              <div class="amt"><Money v={l.net} />{l.paidAt ? <Pill k="ok">Payé {dateShort(l.paidAt)}</Pill> : !l.base ? <Pill k="bad">Salaire à définir</Pill> : <Pill k="warn">À payer</Pill>}</div>
             </button>
           );
         })}
@@ -138,7 +142,7 @@ function PaySheet({ month, line, onClose }: { month: string; line: PayLine; onCl
   const p = person(line.personId)!;
   const [l, setL] = useState(line);
   const [m, setM] = useState<PayMethod>(p.payMethod);
-  const upd = (patch: Partial<PayLine>) => { const n = { ...l, ...patch }; n.net = Math.max(0, n.base - n.deduction - n.advances + n.bonus); setL(n); };
+  const upd = (patch: Partial<PayLine>) => { const n = { ...l, ...patch }; if (patch.base !== undefined) n.deduction = Math.round((n.base / 26) * n.absentDays / 100) * 100; n.net = Math.max(0, n.base - n.deduction - n.advances + n.bonus); setL(n); };
   if (line.paidAt) return (
     <Sheet title={`Salaire de ${p.name}`} onClose={onClose}>
       <div class="done-ic"><Icon n="check" size={28} /></div>
@@ -148,8 +152,11 @@ function PaySheet({ month, line, onClose }: { month: string; line: PayLine; onCl
   );
   return (
     <Sheet title={`Salaire de ${p.name}`} onClose={onClose} foot={
-      <button class="btn pri big" onClick={() => { payLine(month, l, m); toast(`${F(l.net)} envoyés à ${p.name}`); onClose(); }}>Payer {F(l.net)} par {METHODS[m].name}</button>}>
-      <div class="kv"><span>Salaire de base</span><Money v={l.base} /></div>
+      <div class="stack">
+        {l.base !== p.salary && <button class="btn big" onClick={() => { updatePerson(p.id, { salary: l.base }); toast(`Salaire de ${p.name} enregistré`); onClose(); }}>Enregistrer le salaire seulement</button>}
+        <button class="btn pri big" disabled={!l.net} onClick={() => { if (l.base !== p.salary) updatePerson(p.id, { salary: l.base }); payLine(month, l, m); toast(`${F(l.net)} envoyés à ${p.name}`); onClose(); }}>Payer {F(l.net)} par {METHODS[m].name}</button>
+      </div>}>
+      <Field label="Salaire mensuel de base" hint="Enregistré sur la fiche de la personne pour les mois suivants."><NumInput value={l.base} onInput={v => upd({ base: Number(v) || 0 })} /></Field>
       <div class="kv"><span>Absences ({l.absentDays} j.)</span><span class="num">−{fmt(l.deduction)} F</span></div>
       <div class="kv"><span>Avances déjà versées</span><span class="num">−{fmt(l.advances)} F</span></div>
       <Field label="Retenue d'absence (modifiable)"><NumInput value={l.deduction} onInput={v => upd({ deduction: Number(v) || 0 })} /></Field>
