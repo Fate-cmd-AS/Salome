@@ -62,3 +62,13 @@ export const waLink = (phone: string, text: string) => `https://wa.me/${phoneInt
 export const telLink = (phone: string) => `tel:+${phoneIntl(phone)}`;
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+// ---------- quantités (pièces ou poids) ----------
+/** Article vendu au poids ou au volume (quantités décimales). */
+export const isWeighed = (unit?: string) => !!unit && /^(kg|g|l|litres?|m)$/i.test(unit.trim());
+export const fmtQty = (q: number) => (Math.round(q * 1000) / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 3 });
+export const lineTotal = (x: { qty: number; price: number }) => Math.round(x.qty * x.price);
+export const itemLabel = (i: { qty: number; name: string; unit?: string }) =>
+  isWeighed(i.unit) ? `${fmtQty(i.qty)} ${i.unit} ${i.name}` : `${i.qty > 1 ? fmtQty(i.qty) + '× ' : ''}${i.name}`;
+/** Lit « 1,5 » ou « 1.5 » ; NaN si illisible. */
+export const parseDec = (s: string) => { const v = parseFloat(s.replace(/\s/g, '').replace(',', '.')); return Number.isFinite(v) ? v : NaN; };

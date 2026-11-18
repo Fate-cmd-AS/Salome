@@ -48,7 +48,7 @@ export interface Product {
   archived?: boolean; // retiré de la vente (jamais effacé : les anciennes ventes y font référence)
 }
 
-export interface SaleItem { productId: string | null; name: string; qty: number; price: number }
+export interface SaleItem { productId: string | null; name: string; qty: number; price: number; unit?: string }
 
 export interface Sale {
   id: string;

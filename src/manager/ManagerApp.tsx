@@ -4,9 +4,9 @@ import {
   useStore, me, person, recordSale, confirmMobileMoney, cancelSale, addExpense, stockMove, closeDay, checkIn, checkOut,
   ackReminder, locate, logout, salesOf, closeOf, inZone,
 } from '../store';
-import { F, fmt, time, today, dateLong, METHODS, METHOD_KEYS, waLink, phonePretty, dayKey } from '../format';
+import { F, fmt, time, today, dateLong, METHODS, METHOD_KEYS, waLink, phonePretty, dayKey, isWeighed, fmtQty, lineTotal, itemLabel } from '../format';
 import type { PayMethod, Product, Sale, Geo } from '../types';
-import { Icon, Money, MethodBadge, Pill, Sheet, toast, NetChip, TopBar, BottomNav, Section, Empty, Field, NumInput, PhotoInput } from '../ui';
+import { Icon, Money, MethodBadge, Pill, Sheet, toast, NetChip, TopBar, BottomNav, Section, Empty, Field, NumInput, DecInput, PhotoInput } from '../ui';
 
 type Tab = 'accueil' | 'vendre' | 'depenses' | 'stock' | 'caisse';
 
@@ -143,9 +143,11 @@ function Sell() {
   const active = s.products.filter(p => !p.archived);
   const cats = ['Tout', ...Array.from(new Set(active.map(p => p.category)))];
   const list = active.filter(p => (cat === 'Tout' || p.category === cat) && p.name.toLowerCase().includes(q.toLowerCase()));
-  const add = (p: Product) => setCart(c => { const i = c.findIndex(x => x.productId === p.id); if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: n[i].qty + 1 }; return n; } return [...c, { productId: p.id, name: p.name, qty: 1, price: p.price }]; });
-  const total = cart.reduce((a, x) => a + x.qty * x.price, 0);
-  const count = cart.reduce((a, x) => a + x.qty, 0);
+  const [weigh, setWeigh] = useState<Product | null>(null);
+  const addQty = (p: Product, q: number) => setCart(c => { const i = c.findIndex(x => x.productId === p.id); if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: Math.round((n[i].qty + q) * 1000) / 1000 }; return n; } return [...c, { productId: p.id, name: p.name, qty: q, price: p.price, unit: p.unit }]; });
+  const add = (p: Product) => isWeighed(p.unit) ? setWeigh(p) : addQty(p, 1);
+  const total = cart.reduce((a, x) => a + lineTotal(x), 0);
+  const count = cart.reduce((a, x) => a + (isWeighed(x.unit) ? 1 : x.qty), 0);
   const recent = salesOf(today()).slice(-8).reverse();
   return (
     <>
@@ -157,9 +159,9 @@ function Sell() {
           const out = p.trackStock && p.stock <= 0;
           return (
             <button key={p.id} onClick={() => add(p)} class={inCart ? 'in' : ''}>
-              <span class="n">{p.name}</span><span class="p num">{fmt(p.price)} F</span>
-              {p.trackStock && <span class={'st' + (out ? ' bad' : p.stock <= p.lowStock ? ' low' : '')}>{out ? 'épuisé' : `${p.stock} en stock`}</span>}
-              {inCart && <span class="q">{inCart}</span>}
+              <span class="n">{p.name}</span><span class="p num">{fmt(p.price)} F{isWeighed(p.unit) ? ` / ${p.unit}` : ''}</span>
+              {p.trackStock && <span class={'st' + (out ? ' bad' : p.stock <= p.lowStock ? ' low' : '')}>{out ? 'épuisé' : `${fmtQty(p.stock)}${isWeighed(p.unit) ? ' ' + p.unit : ''} en stock`}</span>}
+              {inCart && <span class="q">{fmtQty(inCart)}</span>}
             </button>
           );
         })}
@@ -171,7 +173,7 @@ function Sell() {
           {recent.length ? recent.map(x => (
             <div class="row" key={x.id}>
               <MethodBadge m={x.method} />
-              <div class="main"><div class="ttl">{x.items.map(i => `${i.qty > 1 ? i.qty + '× ' : ''}${i.name}`).join(', ')}</div>
+              <div class="main"><div class="ttl">{x.items.map(itemLabel).join(', ')}</div>
                 <div class="sub">{time(x.at)}{x.status === 'cancelled' ? ` · annulée (${x.cancelReason})` : x.method !== 'cash' ? (x.mmConfirmed ? ` · reçu par ${METHODS[x.method].name}` : ' · en attente de l\'opérateur') : ''}</div></div>
               <div class="amt">{x.status === 'cancelled' ? <s><Money v={x.total} /></s> : <Money v={x.total} />}
                 {x.status === 'ok' && Date.now() - x.at < 30 * 60e3 && <button class="link sm" onClick={() => setCancel(x)}>Annuler</button>}</div>
@@ -186,11 +188,35 @@ function Sell() {
           <button class="btn pri grow" onClick={() => setPay(true)}>{count} article{count > 1 ? 's' : ''} · <span class="num">{fmt(total)} F</span> · Encaisser</button>
         </div>
       )}
+      {weigh && <WeighSheet p={weigh} onClose={() => setWeigh(null)} onAdd={q => { addQty(weigh, q); setWeigh(null); }} />}
       {free && <FreeAmount onClose={() => setFree(false)} onAdd={l => { setCart(c => [...c, l]); setFree(false); }} />}
       {pay && <PaySheet cart={cart} setCart={setCart} onClose={() => setPay(false)} onDone={sale => { setPay(false); setCart([]); setDone(sale); }} />}
       {done && <DoneSheet sale={done} onClose={() => setDone(null)} />}
       {cancel && <CancelSheet sale={cancel} onClose={() => setCancel(null)} />}
     </>
+  );
+}
+
+function WeighSheet({ p, onClose, onAdd }: { p: Product; onClose: () => void; onAdd: (q: number) => void }) {
+  const [mode, setMode] = useState<'poids' | 'montant'>('poids');
+  const [q, setQ] = useState<number | ''>('');
+  const [amount, setAmount] = useState<number | ''>('');
+  const qty = mode === 'poids' ? Number(q) || 0 : Math.round(((Number(amount) || 0) / p.price) * 1000) / 1000;
+  const quick = [0.25, 0.5, 1, 1.5, 2, 3];
+  return (
+    <Sheet title={p.name} onClose={onClose} foot={
+      <button class="btn pri big" disabled={qty <= 0} onClick={() => onAdd(qty)}>Ajouter {fmtQty(qty)} {p.unit} · <span class="num">{fmt(lineTotal({ qty, price: p.price }))} F</span></button>}>
+      <p class="muted">{fmt(p.price)} F le {p.unit}</p>
+      <div class="seg"><button aria-pressed={mode === 'poids'} onClick={() => setMode('poids')}>Au poids</button><button aria-pressed={mode === 'montant'} onClick={() => setMode('montant')}>Pour un montant</button></div>
+      {mode === 'poids' ? (
+        <>
+          <div class="chips wrap">{quick.map(v => <button key={v} class="chip" aria-pressed={q === v} onClick={() => setQ(v)}>{fmtQty(v)} {p.unit}</button>)}</div>
+          <Field label={`Poids exact (${p.unit})`} hint="Lisez le poids sur la balance, ex. 1,35"><DecInput value={q} onInput={setQ} big /></Field>
+        </>
+      ) : (
+        <Field label="Le client veut en avoir pour (F CFA)" hint={amount ? `Soit ${fmtQty(qty)} ${p.unit} à peser` : undefined}><NumInput value={amount} onInput={setAmount} big autoFocus /></Field>
+      )}
+    </Sheet>
   );
 }
 
@@ -209,9 +235,9 @@ function PaySheet({ cart, setCart, onClose, onDone }: { cart: Line[]; setCart: (
   const s = useStore();
   const [m, setM] = useState<PayMethod>('cash');
   const [phone, setPhone] = useState('');
-  const total = cart.reduce((a, x) => a + x.qty * x.price, 0);
+  const total = cart.reduce((a, x) => a + lineTotal(x), 0);
   const mm = METHODS[m].mm;
-  const setQty = (i: number, d: number) => { const n = [...cart]; n[i] = { ...n[i], qty: n[i].qty + d }; setCart(n.filter(x => x.qty > 0)); };
+  const setQty = (i: number, d: number) => { const n = [...cart]; const step = isWeighed(n[i].unit) ? 0.25 * d : d; n[i] = { ...n[i], qty: Math.round((n[i].qty + step) * 1000) / 1000 }; setCart(n.filter(x => x.qty > 0)); };
   return (
     <Sheet title="Encaisser" onClose={onClose} foot={
       <button class="btn pri big" disabled={!cart.length} onClick={() => { const sale = recordSale({ items: cart, method: m, customerPhone: phone.replace(/\D/g, ''), receipt: phone ? 'sms' : 'none' }); onDone(sale); }}>
@@ -220,8 +246,8 @@ function PaySheet({ cart, setCart, onClose, onDone }: { cart: Line[]; setCart: (
       <div class="card list tight">
         {cart.map((x, i) => (
           <div class="row" key={i}>
-            <div class="main"><div class="ttl">{x.name}</div><div class="sub num">{fmt(x.price)} F</div></div>
-            <div class="stepper"><button onClick={() => setQty(i, -1)} aria-label="Moins">−</button><b class="num">{x.qty}</b><button onClick={() => setQty(i, 1)} aria-label="Plus">+</button></div>
+            <div class="main"><div class="ttl">{x.name}</div><div class="sub num">{fmt(x.price)} F{isWeighed(x.unit) ? ` / ${x.unit} · ${fmt(lineTotal(x))} F` : ''}</div></div>
+            <div class="stepper"><button onClick={() => setQty(i, -1)} aria-label="Moins">−</button><b class="num">{fmtQty(x.qty)}{isWeighed(x.unit) ? ` ${x.unit}` : ''}</b><button onClick={() => setQty(i, 1)} aria-label="Plus">+</button></div>
           </div>
         ))}
         <div class="kv tot"><span>Total</span><Money v={total} /></div>
@@ -244,7 +270,7 @@ function DoneSheet({ sale, onClose }: { sale: Sale; onClose: () => void }) {
     // Démo : l'opérateur confirme au bout de 2 secondes (en production : notification de Wave/Orange/MTN/Moov)
     if (cur.method !== 'cash' && !cur.mmConfirmed) { const h = setTimeout(() => confirmMobileMoney(cur.id), 2000); return () => clearTimeout(h); }
   }, []);
-  const receipt = `${s.business.name}\nReçu du ${new Date(cur.at).toLocaleDateString('fr-FR')} à ${time(cur.at)}\n${cur.items.map(i => `${i.qty} × ${i.name} : ${fmt(i.qty * i.price)} F`).join('\n')}\nTOTAL : ${fmt(cur.total)} F (${METHODS[cur.method].name})\nMerci de votre visite !`;
+  const receipt = `${s.business.name}\nReçu du ${new Date(cur.at).toLocaleDateString('fr-FR')} à ${time(cur.at)}\n${cur.items.map(i => `${isWeighed(i.unit) ? `${fmtQty(i.qty)} ${i.unit} × ${fmt(i.price)} F` : `${i.qty} ×`} ${i.name} : ${fmt(lineTotal(i))} F`).join('\n')}\nTOTAL : ${fmt(cur.total)} F (${METHODS[cur.method].name})\nMerci de votre visite !`;
   return (
     <Sheet title="Vente enregistrée" onClose={onClose} foot={<button class="btn pri big" onClick={onClose}>Nouvelle vente</button>}>
       <div class="done-ic"><Icon n="check" size={30} /></div>
@@ -328,7 +354,7 @@ function Stock() {
         {tracked.map(p => (
           <button class="row btnrow" key={p.id} onClick={() => setSel(p)}>
             <div class="main"><div class="ttl">{p.name}</div><div class="sub">alerte sous {p.lowStock} · {fmt(p.price)} F l'unité</div></div>
-            <span class={'qty num' + (p.stock <= p.lowStock ? ' low' : '')}>{p.stock}</span><Icon n="right" size={16} />
+            <span class={'qty num' + (p.stock <= p.lowStock ? ' low' : '')}>{fmtQty(p.stock)}{isWeighed(p.unit) ? <small> {p.unit}</small> : null}</span><Icon n="right" size={16} />
           </button>
         ))}
       </div>
@@ -351,9 +377,9 @@ function StockSheet({ p, onClose }: { p: Product; onClose: () => void }) {
         else stockMove({ productId: p.id, kind, qty: kind === 'loss' ? -Number(n) : Number(n), note, photo });
         toast('Stock mis à jour'); onClose();
       }}>Enregistrer</button>}>
-      <p class="muted">Stock actuel : <b class="num">{p.stock}</b> {p.unit}(s)</p>
+      <p class="muted">Stock actuel : <b class="num">{fmtQty(p.stock)}</b> {p.unit}{isWeighed(p.unit) ? '' : '(s)'}</p>
       <div class="seg">{(['delivery', 'loss', 'inventory'] as const).map(k => <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>{labels[k]}</button>)}</div>
-      <Field label={kind === 'inventory' ? 'Combien en comptez-vous ?' : 'Quantité'} hint={kind === 'inventory' ? 'Comptez sans regarder le chiffre au-dessus.' : undefined}><NumInput value={n} onInput={setN} big /></Field>
+      <Field label={kind === 'inventory' ? 'Combien en comptez-vous ?' : 'Quantité'} hint={kind === 'inventory' ? (isWeighed(p.unit) ? `Pesez sans regarder le chiffre au-dessus (en ${p.unit}, ex. 12,5).` : 'Comptez sans regarder le chiffre au-dessus.') : isWeighed(p.unit) ? `En ${p.unit}, ex. 12,5` : undefined}>{isWeighed(p.unit) ? <DecInput value={n} onInput={setN} big /> : <NumInput value={n} onInput={setN} big />}</Field>
       <Field label={kind === 'loss' ? 'Motif (obligatoire)' : 'Note'}><input class="inp" value={note} placeholder={kind === 'delivery' ? 'ex. Solibra, bon n° 4512' : kind === 'loss' ? 'ex. 2 bouteilles cassées au service' : ''} onInput={e => setNote(e.currentTarget.value)} /></Field>
       {kind !== 'inventory' && <Field label={kind === 'delivery' ? 'Photo du bon de livraison' : 'Photo de la casse'}><PhotoInput value={photo} onChange={setPhoto} /></Field>}
     </Sheet>

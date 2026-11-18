@@ -114,6 +114,13 @@ export function NumInput(props: { value: number | ''; onInput: (v: number | '') 
     onInput={e => { const d = (e.currentTarget.value || '').replace(/\D/g, ''); props.onInput(d ? Number(d) : ''); }} />;
 }
 
+/** Saisie d'une quantité décimale (ex. 1,5 kg). */
+export function DecInput({ value, onInput, placeholder, big, autoFocus, id }: { value: number | ''; onInput: (v: number | '') => void; placeholder?: string; big?: boolean; autoFocus?: boolean; id?: string }) {
+  const [raw, setRaw] = useState(value === '' ? '' : String(value).replace('.', ','));
+  return <input id={id} class={'inp num' + (big ? ' big' : '')} inputMode="decimal" placeholder={placeholder ?? '0'} autoFocus={autoFocus} value={raw}
+    onInput={e => { const t = e.currentTarget.value.replace(/[^0-9.,]/g, ''); setRaw(t); const v = parseFloat(t.replace(',', '.')); onInput(Number.isFinite(v) ? v : ''); }} />;
+}
+
 export function PhotoInput({ value, onChange, label = 'Prendre une photo', capture = 'environment' }: { value?: string; onChange: (v?: string) => void; label?: string; capture?: 'environment' | 'user' }) {
   const [busy, setBusy] = useState(false);
   return (

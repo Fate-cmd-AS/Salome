@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { useStore, logout, revenue, okSales, salesOf, expectedCash, closeOf, avgRevenue, revenueUntilHour, decideExpense, checkSale, markSeen, person } from '../store';
 import { computeAlerts, trustScore } from '../alerts';
-import { F, fmt, signedF, time, today, shiftDay, dayLabel, dateShort, METHODS, METHOD_KEYS, waLink, telLink, phonePretty, hourOf, ago, dayKey } from '../format';
+import { F, fmt, signedF, time, today, shiftDay, dayLabel, dateShort, METHODS, METHOD_KEYS, waLink, telLink, phonePretty, hourOf, ago, dayKey, itemLabel, lineTotal, isWeighed, fmtQty } from '../format';
 import type { Sale, Expense, Alert } from '../types';
 import { Icon, Money, MethodBadge, Pill, Sheet, toast, NetChip, TopBar, BottomNav, Section, Empty, Bars, Split, Field } from '../ui';
 import { Team, CashPage, StockPage, InvoicesPage, LogPage, SettingsPage } from './OwnerMore';
@@ -137,7 +137,7 @@ function SaleRow({ x, onClick }: { x: Sale; onClick?: () => void }) {
   return (
     <button class="row btnrow" onClick={onClick} disabled={!onClick}>
       <MethodBadge m={x.method} />
-      <div class="main"><div class="ttl">{x.items.map(i => `${i.qty > 1 ? i.qty + '× ' : ''}${i.name}`).join(', ')}</div>
+      <div class="main"><div class="ttl">{x.items.map(itemLabel).join(', ')}</div>
         <div class="sub">{time(x.at)} · {person(x.byId)?.name}{x.customerPhone ? ` · client ${phonePretty(x.customerPhone)}` : ''} {tags}</div></div>
       <span class="amt">{x.status === 'cancelled' ? <s><Money v={x.total} /></s> : <Money v={x.total} />}</span>
     </button>
@@ -190,7 +190,7 @@ function SaleSheet({ x, onClose }: { x: Sale; onClose: () => void }) {
   return (
     <Sheet title={`Vente de ${F(x.total)}`} onClose={onClose}>
       <div class="card list tight">
-        {x.items.map((i, k) => <div class="kv" key={k}><span>{i.qty} × {i.name}</span><Money v={i.qty * i.price} /></div>)}
+        {x.items.map((i, k) => <div class="kv" key={k}><span>{isWeighed(i.unit) ? `${fmtQty(i.qty)} ${i.unit} × ${fmt(i.price)} F` : `${i.qty} ×`} {i.name}</span><Money v={lineTotal(i)} /></div>)}
         <div class="kv tot"><span>Total</span><Money v={x.total} /></div>
       </div>
       <div class="kv"><span>Heure</span><b>{dateShort(x.at)} à {time(x.at)}</b></div>

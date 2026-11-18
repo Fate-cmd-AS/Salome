@@ -4,7 +4,7 @@ import {
   updateBusiness, updatePerson, addPerson, resetDemo, logout, getMode, leaveMode, get,
 } from '../store';
 import { sb, signOutAll } from '../sync';
-import { F, fmt, signedF, time, today, shiftDay, dayLabel, dateShort, METHODS, METHOD_KEYS, monthKey, monthLabel, waLink, phonePretty, weekday, uid } from '../format';
+import { F, fmt, signedF, time, today, shiftDay, dayLabel, dateShort, METHODS, METHOD_KEYS, monthKey, monthLabel, waLink, phonePretty, weekday, uid, isWeighed, fmtQty, lineTotal, parseDec } from '../format';
 import type { PayLine, PayMethod, Product, Invoice, Person } from '../types';
 import { Icon, Money, MethodBadge, Pill, Sheet, toast, Section, Empty, Field, NumInput } from '../ui';
 
@@ -228,8 +228,8 @@ export function StockPage() {
         <div class="card list">
           {s.products.filter(p => !p.archived).map(p => (
             <button class="row btnrow" key={p.id} onClick={() => setEdit(p)}>
-              <div class="main"><div class="ttl">{p.name}</div><div class="sub">{p.category} · vente {fmt(p.price)} F · achat {fmt(p.cost)} F</div></div>
-              {p.trackStock ? <span class={'qty num' + (p.stock <= p.lowStock ? ' low' : '')}>{p.stock}</span> : <span class="sub">non suivi</span>}
+              <div class="main"><div class="ttl">{p.name}</div><div class="sub">{p.category} · vente {fmt(p.price)} F{isWeighed(p.unit) ? ` / ${p.unit}` : ''} · achat {fmt(p.cost)} F</div></div>
+              {p.trackStock ? <span class={'qty num' + (p.stock <= p.lowStock ? ' low' : '')}>{fmtQty(p.stock)}{isWeighed(p.unit) ? <small> {p.unit}</small> : null}</span> : <span class="sub">non suivi</span>}
             </button>
           ))}
         </div>
@@ -252,7 +252,7 @@ export function StockPage() {
           return (
             <div class="row" key={m.id}>
               <div class="main"><div class="ttl">{m.kind === 'delivery' ? 'Livraison' : m.kind === 'loss' ? 'Casse / perte' : 'Inventaire'} · {p?.name}</div><div class="sub">{dateShort(m.at)} {time(m.at)} · {m.note}{m.kind === 'inventory' ? ` · ${m.counted} comptés / ${m.expected} attendus` : ''}</div></div>
-              <span class={'amt num ' + (m.qty < 0 ? 'neg' : '')}>{m.qty > 0 ? '+' : ''}{m.qty}</span>
+              <span class={'amt num ' + (m.qty < 0 ? 'neg' : '')}>{m.qty > 0 ? '+' : ''}{fmtQty(m.qty)}</span>
             </div>);
         })}</div>
       </Section>
@@ -271,6 +271,10 @@ function ProductSheet({ p, onClose }: { p: Product; onClose: () => void }) {
         <Field label="Prix de vente"><NumInput value={x.price} onInput={v => setX({ ...x, price: Number(v) || 0 })} /></Field>
         <Field label="Prix d'achat"><NumInput value={x.cost} onInput={v => setX({ ...x, cost: Number(v) || 0 })} /></Field>
       </div>
+      <Field label="Vendu"><div class="seg">
+        <button aria-pressed={!isWeighed(x.unit)} onClick={() => setX({ ...x, unit: isWeighed(x.unit) ? 'pièce' : x.unit })}>À la pièce</button>
+        <button aria-pressed={isWeighed(x.unit)} onClick={() => setX({ ...x, unit: 'kg' })}>Au kilo</button>
+      </div></Field>
       <label class="check"><input type="checkbox" checked={x.trackStock} onChange={e => setX({ ...x, trackStock: e.currentTarget.checked })} /> Suivre le stock de cet article</label>
       {x.trackStock && <div class="grid2">
         <Field label="Alerte sous"><NumInput value={x.lowStock} onInput={v => setX({ ...x, lowStock: Number(v) || 0 })} /></Field>
@@ -314,9 +318,9 @@ export function InvoicesPage() {
 function InvoiceSheet({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
   const s = useStore();
   const [x, setX] = useState(inv);
-  const total = x.lines.reduce((a, l) => a + l.qty * l.price, 0);
+  const total = x.lines.reduce((a, l) => a + lineTotal(l), 0);
   const setLine = (i: number, patch: Partial<Invoice['lines'][number]>) => setX({ ...x, lines: x.lines.map((l, k) => k === i ? { ...l, ...patch } : l) });
-  const text = `${s.business.name}\nFacture ${x.number} du ${dateShort(x.issuedAt)}\nPour : ${x.party}\n${x.lines.map(l => `${l.qty} × ${l.label} : ${fmt(l.qty * l.price)} F`).join('\n')}\nTOTAL : ${fmt(total)} F\nÀ régler avant le ${dateShort(x.dueAt)} par Wave, Orange Money ou espèces.`;
+  const text = `${s.business.name}\nFacture ${x.number} du ${dateShort(x.issuedAt)}\nPour : ${x.party}\n${x.lines.map(l => `${fmtQty(l.qty)} × ${l.label} : ${fmt(lineTotal(l))} F`).join('\n')}\nTOTAL : ${fmt(total)} F\nÀ régler avant le ${dateShort(x.dueAt)} par Wave, Orange Money ou espèces.`;
   const save = (patch: Partial<Invoice> = {}) => { saveInvoice({ ...x, ...patch, total }); toast('Facture enregistrée'); onClose(); };
   return (
     <Sheet title={x.kind === 'client' ? `Facture ${x.number}` : `Facture fournisseur`} onClose={onClose} foot={
@@ -331,7 +335,7 @@ function InvoiceSheet({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
         <div class="stack">{x.lines.map((l, i) => (
           <div class="invline" key={i}>
             <input class="inp" placeholder="Désignation" value={l.label} onInput={e => setLine(i, { label: e.currentTarget.value })} />
-            <input class="inp num" inputMode="numeric" aria-label="Quantité" value={l.qty} onInput={e => setLine(i, { qty: Number(e.currentTarget.value.replace(/\D/g, '')) || 0 })} />
+            <input class="inp num" inputMode="decimal" aria-label="Quantité" defaultValue={String(l.qty).replace('.', ',')} onInput={e => { const v = parseDec(e.currentTarget.value); setLine(i, { qty: Number.isFinite(v) ? v : 0 }); }} />
             <NumInput value={l.price} onInput={v => setLine(i, { price: Number(v) || 0 })} />
           </div>))}
           <button class="link" onClick={() => setX({ ...x, lines: [...x.lines, { label: '', qty: 1, price: 0 }] })}>+ Ajouter une ligne</button>

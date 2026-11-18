@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { State, Sale, Expense, PayMethod, Role, CashClose, StockMove, Invoice, PayRun, PayLine, Geo } from './types';
 import { makeSeed } from './seed';
-import { dayKey, today, setTz, uid, monthKey, hourOf, weekday } from './format';
+import { dayKey, today, setTz, uid, monthKey, hourOf, weekday, lineTotal } from './format';
 
 const MODE_KEY = 'salome-mode';
 export type Mode = 'demo' | 'cloud' | null;
@@ -195,14 +195,14 @@ export function logout() { state = { ...state, session: null }; notify(); }
 export function resetDemo() { state = makeSeed(); save(); notify(); }
 
 export function recordSale(input: { items: Sale['items']; method: PayMethod; customerPhone?: string; receipt: Sale['receipt'] }) {
-  const total = input.items.reduce((a, x) => a + x.qty * x.price, 0);
+  const total = input.items.reduce((a, x) => a + lineTotal(x), 0);
   const sale: Sale = { id: uid(), at: Date.now(), items: input.items, total, method: input.method, byId: state.session!.personId, status: 'ok', customerPhone: input.customerPhone || undefined, receipt: input.receipt };
   if (input.method !== 'cash') sale.mmConfirmed = false;
   commit(s => {
     s.sales.push(sale);
     for (const it of input.items) {
       const p = s.products.find(x => x.id === it.productId);
-      if (p?.trackStock) p.stock -= it.qty;
+      if (p?.trackStock) p.stock = Math.round((p.stock - it.qty) * 1000) / 1000;
     }
   }, 'Vente', `${total} F · ${input.method}`);
   return sale;
@@ -215,7 +215,7 @@ export function cancelSale(id: string, reason: string) {
   commit(s => {
     const x = s.sales.find(v => v.id === id); if (!x) return;
     x.status = 'cancelled'; x.cancelReason = reason; x.cancelledAt = Date.now();
-    for (const it of x.items) { const p = s.products.find(q => q.id === it.productId); if (p?.trackStock) p.stock += it.qty; }
+    for (const it of x.items) { const p = s.products.find(q => q.id === it.productId); if (p?.trackStock) p.stock = Math.round((p.stock + it.qty) * 1000) / 1000; }
   }, 'Vente annulée', reason);
 }
 export function checkSale(id: string, result: 'confirmed' | 'disputed', note?: string) {
@@ -235,7 +235,8 @@ export function stockMove(m: Omit<StockMove, 'id' | 'at' | 'byId' | 'qty' | 'exp
     const p = s.products.find(x => x.id === m.productId)!;
     const mv: StockMove = { ...m, id: uid(), at: Date.now(), byId: s.session!.personId, qty: m.qty ?? 0 };
     if (m.kind === 'inventory') { mv.expected = p.stock; mv.qty = (m.counted ?? 0) - p.stock; p.stock = m.counted ?? 0; }
-    else p.stock += mv.qty;
+    else p.stock = Math.round((p.stock + mv.qty) * 1000) / 1000;
+    mv.qty = Math.round(mv.qty * 1000) / 1000;
     s.stockMoves.push(mv);
   }, m.kind === 'delivery' ? 'Réception stock' : m.kind === 'loss' ? 'Perte de stock' : 'Inventaire', m.note ?? '');
 }
