@@ -45,6 +45,7 @@ export interface Product {
   stock: number; // stock théorique
   lowStock: number;
   unit: string;
+  archived?: boolean; // retiré de la vente (jamais effacé : les anciennes ventes y font référence)
 }
 
 export interface SaleItem { productId: string | null; name: string; qty: number; price: number }

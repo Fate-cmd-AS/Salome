@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import {
-  useStore, person, sendReminder, computePayRun, payLine, addAdvance, closeOf, saveProduct, saveInvoice, nextInvoiceNumber,
+  useStore, person, sendReminder, computePayRun, payLine, addAdvance, closeOf, saveProduct, archiveProduct, saveInvoice, nextInvoiceNumber,
   updateBusiness, updatePerson, addPerson, resetDemo, logout, getMode, leaveMode, get,
 } from '../store';
 import { sb, signOutAll } from '../sync';
@@ -217,7 +217,8 @@ export function CashPage({ focus }: { focus?: string }) {
 export function StockPage() {
   const s = useStore();
   const [edit, setEdit] = useState<Product | null>(null);
-  const tracked = s.products.filter(p => p.trackStock);
+  const tracked = s.products.filter(p => p.trackStock && !p.archived);
+  const archived = s.products.filter(p => p.archived);
   const value = tracked.reduce((a, p) => a + Math.max(0, p.stock) * p.cost, 0);
   const moves = s.stockMoves.slice().sort((a, b) => b.at - a.at).slice(0, 12);
   return (
@@ -225,7 +226,7 @@ export function StockPage() {
       <div class="kpis"><div><span>Valeur du stock</span><b class="num">{fmt(value)}</b></div><div><span>Articles suivis</span><b class="num">{tracked.length}</b></div><div><span>Bientôt épuisés</span><b class="num">{tracked.filter(p => p.stock <= p.lowStock).length}</b></div></div>
       <Section title="Articles" aside={<button class="link" onClick={() => setEdit({ id: uid(), name: '', category: 'Boissons', price: 0, cost: 0, trackStock: true, stock: 0, lowStock: 6, unit: 'unité' })}>+ Ajouter</button>}>
         <div class="card list">
-          {s.products.map(p => (
+          {s.products.filter(p => !p.archived).map(p => (
             <button class="row btnrow" key={p.id} onClick={() => setEdit(p)}>
               <div class="main"><div class="ttl">{p.name}</div><div class="sub">{p.category} · vente {fmt(p.price)} F · achat {fmt(p.cost)} F</div></div>
               {p.trackStock ? <span class={'qty num' + (p.stock <= p.lowStock ? ' low' : '')}>{p.stock}</span> : <span class="sub">non suivi</span>}
@@ -233,6 +234,18 @@ export function StockPage() {
           ))}
         </div>
       </Section>
+      {archived.length > 0 && (
+        <Section title="Retirés de la vente">
+          <div class="card list">
+            {archived.map(p => (
+              <div class="row" key={p.id}>
+                <div class="main"><div class="ttl">{p.name}</div><div class="sub">{p.category} · {fmt(p.price)} F</div></div>
+                <button class="btn sm" onClick={() => { archiveProduct(p.id, false); toast(`${p.name} est de nouveau en vente`); }}>Remettre en vente</button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
       <Section title="Mouvements récents">
         <div class="card list">{moves.map(m => {
           const p = s.products.find(x => x.id === m.productId);
@@ -249,6 +262,7 @@ export function StockPage() {
 }
 function ProductSheet({ p, onClose }: { p: Product; onClose: () => void }) {
   const [x, setX] = useState(p);
+  const [confirmDel, setConfirmDel] = useState(false);
   return (
     <Sheet title={p.name || 'Nouvel article'} onClose={onClose} foot={<button class="btn pri big" disabled={!x.name || !x.price} onClick={() => { saveProduct(x); toast('Article enregistré'); onClose(); }}>Enregistrer</button>}>
       <Field label="Nom"><input class="inp" value={x.name} onInput={e => setX({ ...x, name: e.currentTarget.value })} /></Field>
@@ -263,6 +277,13 @@ function ProductSheet({ p, onClose }: { p: Product; onClose: () => void }) {
         <Field label="Unité"><input class="inp" value={x.unit} onInput={e => setX({ ...x, unit: e.currentTarget.value })} /></Field>
       </div>}
       <p class="hint">Seul le propriétaire peut changer les prix. Chaque changement est noté dans le journal.</p>
+      {p.name && (!confirmDel
+        ? <button class="btn danger big" onClick={() => setConfirmDel(true)}>Retirer cet article de la vente</button>
+        : <div class="banner bad">
+            <b>Retirer « {p.name} » ?</b>
+            L'article disparaît de la caisse et du stock. Les ventes passées restent intactes, et vous pourrez le remettre en vente plus tard.
+            <div class="grid2"><button class="btn" onClick={() => setConfirmDel(false)}>Annuler</button><button class="btn danger" onClick={() => { archiveProduct(p.id, true); toast(`${p.name} retiré de la vente`); onClose(); }}>Oui, retirer</button></div>
+          </div>)}
     </Sheet>
   );
 }

@@ -250,3 +250,4 @@ table.att{width:100%;border-collapse:collapse;font-size:12px}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .invite{font-size:34px;font-weight:700;letter-spacing:.2em;text-align:center;padding:8px;background:var(--surface-2);border-radius:12px}
+.banner .grid2 .btn{justify-self:stretch}

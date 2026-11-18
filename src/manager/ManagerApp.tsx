@@ -140,8 +140,9 @@ function Sell() {
   const [free, setFree] = useState(false);
   const [done, setDone] = useState<Sale | null>(null);
   const [cancel, setCancel] = useState<Sale | null>(null);
-  const cats = ['Tout', ...Array.from(new Set(s.products.map(p => p.category)))];
-  const list = s.products.filter(p => (cat === 'Tout' || p.category === cat) && p.name.toLowerCase().includes(q.toLowerCase()));
+  const active = s.products.filter(p => !p.archived);
+  const cats = ['Tout', ...Array.from(new Set(active.map(p => p.category)))];
+  const list = active.filter(p => (cat === 'Tout' || p.category === cat) && p.name.toLowerCase().includes(q.toLowerCase()));
   const add = (p: Product) => setCart(c => { const i = c.findIndex(x => x.productId === p.id); if (i >= 0) { const n = [...c]; n[i] = { ...n[i], qty: n[i].qty + 1 }; return n; } return [...c, { productId: p.id, name: p.name, qty: 1, price: p.price }]; });
   const total = cart.reduce((a, x) => a + x.qty * x.price, 0);
   const count = cart.reduce((a, x) => a + x.qty, 0);
@@ -318,7 +319,7 @@ function NewExpense({ onClose }: { onClose: () => void }) {
 function Stock() {
   const s = useStore();
   const [sel, setSel] = useState<Product | null>(null);
-  const tracked = s.products.filter(p => p.trackStock);
+  const tracked = s.products.filter(p => p.trackStock && !p.archived);
   const low = tracked.filter(p => p.stock <= p.lowStock);
   return (
     <>

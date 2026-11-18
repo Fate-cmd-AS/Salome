@@ -239,6 +239,9 @@ export function stockMove(m: Omit<StockMove, 'id' | 'at' | 'byId' | 'qty' | 'exp
     s.stockMoves.push(mv);
   }, m.kind === 'delivery' ? 'Réception stock' : m.kind === 'loss' ? 'Perte de stock' : 'Inventaire', m.note ?? '');
 }
+export function archiveProduct(id: string, archived: boolean) {
+  commit(s => { const p = s.products.find(x => x.id === id); if (p) p.archived = archived; }, archived ? 'Article retiré de la vente' : 'Article remis en vente', state.products.find(x => x.id === id)?.name ?? '');
+}
 export function saveProduct(p: State['products'][number]) {
   commit(s => { const i = s.products.findIndex(x => x.id === p.id); if (i >= 0) s.products[i] = p; else s.products.push(p); }, 'Article modifié', p.name);
 }
