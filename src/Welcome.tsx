@@ -9,7 +9,8 @@ type View = 'home' | 'owner' | 'join';
 
 const errFr = (m: string) => {
   if (/Invalid login/i.test(m)) return 'Email ou mot de passe incorrect.';
-  if (/already registered/i.test(m)) return 'Un compte existe déjà avec cet email. Choisissez « Se connecter ».';
+  if (/already registered/i.test(m)) return 'Un compte existe déjà avec cet email, mais le mot de passe ne correspond pas. Choisissez « Se connecter » avec le bon mot de passe.';
+  if (/permission denied/i.test(m)) return "Le serveur refuse l'accès : il manque le correctif SQL « fix-01-droits.sql » dans Supabase.";
   if (/Anonymous sign-ins are disabled/i.test(m)) return "Les connexions par code ne sont pas encore activées sur le serveur (réglage Supabase « Allow anonymous sign-ins »).";
   if (/Code inconnu/i.test(m)) return 'Ce code ne correspond à aucun commerce. Vérifiez-le auprès du propriétaire.';
   if (/Password should be/i.test(m)) return 'Le mot de passe doit faire au moins 6 caractères.';
@@ -69,10 +70,22 @@ function Owner({ back }: { back: () => void }) {
     try {
       let userId: string | undefined;
       if (tab === 'new') {
-        const { data, error } = await sb.auth.signUp({ email: email.trim(), password: pwd, options: { data: { name } } });
-        if (error) throw error;
-        if (!data.session) { setInfo("Compte créé. Ouvrez l'email de confirmation que vous venez de recevoir, puis revenez ici et choisissez « Se connecter »."); setTab('login'); setBusy(false); return; }
-        userId = data.user!.id;
+        // déjà connecté (ou compte déjà créé lors d'un premier essai) : on réutilise le compte
+        const { data: cur } = await sb.auth.getSession();
+        if (cur.session && cur.session.user.email === email.trim().toLowerCase()) userId = cur.session.user.id;
+        else {
+          const { data, error } = await sb.auth.signUp({ email: email.trim(), password: pwd, options: { data: { name } } });
+          if (error && /already registered/i.test(error.message)) {
+            const r = await sb.auth.signInWithPassword({ email: email.trim(), password: pwd });
+            if (r.error) throw error;
+            userId = r.data.user.id;
+          } else {
+            if (error) throw error;
+            if (!data.session) { setInfo("Compte créé. Ouvrez l'email de confirmation que vous venez de recevoir, puis revenez ici et choisissez « Se connecter »."); setTab('login'); setBusy(false); return; }
+            userId = data.user!.id;
+          }
+        }
+        if (await openExisting(userId)) return;
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password: pwd });
         if (error) throw error;
