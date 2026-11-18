@@ -1,0 +1,11 @@
+{
+  "name": "Salomé",
+  "short_name": "Salomé",
+  "description": "Suivez votre commerce à distance, en temps réel.",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ECF0EA",
+  "theme_color": "#0B6E4F",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
