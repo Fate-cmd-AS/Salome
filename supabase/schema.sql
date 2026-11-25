@@ -104,6 +104,10 @@ end $$;
 create or replace function public.log_record() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  -- seul le propriétaire peut donner le droit d'export Excel : un gérant ne peut pas se l'attribuer
+  if new.collection = 'people' and member_role(new.business_id) = 'manager' then
+    new.data := new.data - 'canExport';
+  end if;
   new.updated_at := now();
   new.updated_by := auth.uid();
   insert into record_history (business_id, collection, id, op, data, by)

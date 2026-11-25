@@ -5,13 +5,15 @@ import { computeAlerts, trustScore } from '../alerts';
 import { F, fmt, signedF, time, today, shiftDay, dayLabel, dateShort, METHODS, METHOD_KEYS, waLink, telLink, phonePretty, hourOf, ago, dayKey, itemLabel, lineTotal, isWeighed, fmtQty } from '../format';
 import type { Sale, Expense, Alert } from '../types';
 import { Icon, Money, MethodBadge, Pill, Sheet, toast, NetChip, TopBar, BottomNav, Section, Empty, Bars, Split, Field } from '../ui';
+import { ExportPanel } from '../ExportPanel';
 import { Team, CashPage, StockPage, InvoicesPage, LogPage, SettingsPage } from './OwnerMore';
 
-export type OTab = 'accueil' | 'ventes' | 'alertes' | 'equipe' | 'plus' | 'caisse' | 'stock' | 'factures' | 'journal' | 'reglages';
+export type OTab = 'accueil' | 'ventes' | 'alertes' | 'equipe' | 'plus' | 'caisse' | 'stock' | 'factures' | 'journal' | 'reglages' | 'export';
 const PLUS: [OTab, string, string, string][] = [
   ['caisse', 'Caisse et clôtures', 'lock', 'Comptages du soir et écarts'],
   ['stock', 'Stock et articles', 'box', 'Niveaux, inventaires, prix'],
   ['factures', 'Factures', 'doc', 'Clients et fournisseurs'],
+  ['export', 'Export Excel', 'doc', 'Tous les mouvements, pour vos analyses'],
   ['journal', "Journal d'activité", 'list', 'Tout ce qui a été fait, par qui'],
   ['reglages', 'Réglages', 'gear', 'Commerce, seuils, équipe'],
 ];
@@ -45,6 +47,7 @@ export function OwnerApp() {
         {tab === 'factures' && <InvoicesPage />}
         {tab === 'journal' && <LogPage />}
         {tab === 'reglages' && <SettingsPage />}
+        {tab === 'export' && <ExportPanel />}
       </main>
       <BottomNav<OTab> cur={main} onTab={t => go(t)} tabs={[
         ['accueil', 'Accueil', 'home'],

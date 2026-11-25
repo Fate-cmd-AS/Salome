@@ -32,6 +32,7 @@ export interface Person {
   salary: number; // mensuel
   payMethod: PayMethod;
   restDay?: number; // 0 = dimanche … 6 = samedi
+  canExport?: boolean; // gérant autorisé par le propriétaire à faire l'export Excel
   active: boolean;
 }
 

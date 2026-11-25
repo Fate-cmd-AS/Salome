@@ -322,3 +322,4 @@ export function updatePerson(id: string, p: Partial<State['people'][number]>) { 
 export function addPerson(p: Omit<State['people'][number], 'id'>) { commit(s => { s.people.push({ ...p, id: uid() }); }, 'Équipe', p.name); }
 export function markSeen(ids: string[]) { commit(s => { s.seenAlerts = Array.from(new Set(s.seenAlerts.concat(ids))); }); }
 export function upsertPerson(p: State['people'][number]) { commit(s => { const i = s.people.findIndex(x => x.id === p.id); if (i >= 0) s.people[i] = p; else s.people.push(p); }, 'Équipe', p.name); }
+export function logExport(from: string, to: string) { commit(() => {}, 'Export Excel', `du ${from} au ${to}`); }

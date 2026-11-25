@@ -406,7 +406,7 @@ export function SettingsPage() {
         <div class="card list">{s.people.filter(p => p.role !== 'owner').map(p => (
           <button class="row btnrow" key={p.id} onClick={() => setEdit(p)}>
             <span class="av sm">{p.name[0]}</span>
-            <div class="main"><div class="ttl">{p.name}{!p.active ? ' (inactif)' : ''}</div><div class="sub">{p.job} · {fmt(p.salary)} F/mois · repos {DAYS[p.restDay ?? 0]}</div></div>
+            <div class="main"><div class="ttl">{p.name}{!p.active ? ' (inactif)' : ''}</div><div class="sub">{p.job} · {fmt(p.salary)} F/mois · repos {DAYS[p.restDay ?? 0]}{p.canExport ? ' · export autorisé' : ''}</div></div>
             <Icon n="right" size={16} />
           </button>))}</div>
       </Section>
@@ -454,6 +454,7 @@ function PersonSheet({ p, onClose }: { p: Person; onClose: () => void }) {
       <Field label="Payé par"><select class="inp" value={x.payMethod} onChange={e => setX({ ...x, payMethod: e.currentTarget.value as PayMethod })}>{METHOD_KEYS.map(k => <option key={k} value={k}>{METHODS[k].name}</option>)}</select></Field>
       <label class="check"><input type="checkbox" checked={x.role === 'manager'} onChange={e => setX({ ...x, role: e.currentTarget.checked ? 'manager' : 'staff', pin: x.pin ?? '' })} /> Peut se connecter à l'appli (gérant·e)</label>
       {x.role === 'manager' && <Field label="Code à 4 chiffres"><input class="inp num" inputMode="numeric" maxLength={4} value={x.pin ?? ''} onInput={e => setX({ ...x, pin: e.currentTarget.value.replace(/\D/g, '').slice(0, 4) })} /></Field>}
+      {x.role === 'manager' && <label class="check"><input type="checkbox" checked={!!x.canExport} onChange={e => setX({ ...x, canExport: e.currentTarget.checked })} /> Autoriser l'export Excel des données</label>}
       <label class="check"><input type="checkbox" checked={x.active} onChange={e => setX({ ...x, active: e.currentTarget.checked })} /> Fait partie de l'équipe</label>
     </Sheet>
   );

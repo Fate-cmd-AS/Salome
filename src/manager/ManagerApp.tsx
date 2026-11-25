@@ -6,6 +6,8 @@ import {
 } from '../store';
 import { F, fmt, time, today, dateLong, METHODS, METHOD_KEYS, waLink, phonePretty, dayKey, isWeighed, fmtQty, lineTotal, itemLabel } from '../format';
 import type { PayMethod, Product, Sale, Geo } from '../types';
+import { canExport } from '../export';
+import { ExportPanel } from '../ExportPanel';
 import { Icon, Money, MethodBadge, Pill, Sheet, toast, NetChip, TopBar, BottomNav, Section, Empty, Field, NumInput, DecInput, PhotoInput } from '../ui';
 
 type Tab = 'accueil' | 'vendre' | 'depenses' | 'stock' | 'caisse';
@@ -47,6 +49,7 @@ function Home({ go }: { go: (t: Tab) => void }) {
   const total = sales.reduce((a, x) => a + x.total, 0);
   const team = s.people.filter(p => p.active && p.role !== 'owner');
   const [pointing, setPointing] = useState<string | null>(null);
+  const [exp, setExp] = useState(false);
   const pending = s.expenses.filter(e => e.status === 'pending');
   return (
     <>
@@ -96,6 +99,11 @@ function Home({ go }: { go: (t: Tab) => void }) {
           <div class="card list">
             {pending.map(e => <div class="row" key={e.id}><div class="main"><div class="ttl">{e.label}</div><div class="sub">{time(e.at)} · {e.photo ? 'reçu joint' : 'sans reçu'}</div></div><span class="amt"><Money v={e.amount} /></span></div>)}
           </div>
+        </Section>
+      )}
+      {canExport(s, me()) && (
+        <Section title="Export Excel" aside="autorisé par le propriétaire">
+          {exp ? <div class="card"><ExportPanel /></div> : <button class="btn big" onClick={() => setExp(true)}><Icon n="doc" size={18} /> Exporter les mouvements</button>}
         </Section>
       )}
       {pointing && <CheckInSheet personId={pointing} onClose={() => setPointing(null)} />}
