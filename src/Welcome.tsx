@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import { startDemo, startCloud, upsertPerson, login, get } from './store';
 import { sb, seedUpload, startSync } from './sync';
 import { makeEmpty } from './seed';
-import { Icon, Field } from './ui';
+import { Icon, Field, Deco } from './ui';
 
 type View = 'home' | 'owner' | 'join';
 
@@ -23,15 +23,24 @@ export function Welcome() {
   const [v, setV] = useState<View>('home');
   return (
     <div class="login">
-      <div class="brand"><span class="logo">S</span>Salomé</div>
+      <Deco sm={v !== 'home'} />
       {v === 'home' && (
         <>
+          <div class="brand">Salomé</div>
           <h1>Votre commerce, vu de loin, en toute confiance.</h1>
-          <p class="muted">Ventes en direct, caisse vérifiée, dépenses justifiées, équipe suivie.</p>
+          <p class="lead">Ventes en direct, caisse vérifiée, dépenses justifiées, équipe suivie.</p>
           <div class="who">
-            <button class="who-b" onClick={() => setV('owner')}><span class="av"><Icon n="shield" size={18} /></span><span><b>Je suis propriétaire</b><small>Créer mon commerce ou me connecter</small></span><Icon n="right" /></button>
+            <button class="who-b pri" onClick={() => setV('owner')}><span class="av"><Icon n="shield" size={18} /></span><span><b>Je suis propriétaire</b><small>Créer mon commerce ou me connecter</small></span><Icon n="right" /></button>
             <button class="who-b" onClick={() => setV('join')}><span class="av"><Icon n="cart" size={18} /></span><span><b>Je suis gérant·e</b><small>Rejoindre le commerce avec le code reçu</small></span><Icon n="right" /></button>
-            <button class="link" onClick={startDemo}>Essayer avec des données de démo</button>
+            <button class="link" style={{ justifySelf: 'center' }} onClick={startDemo}>Essayer avec des données de démo</button>
+          </div>
+          <div class="promise">
+            <b>Ce que vous voyez, même à 5 000 km</b>
+            <ul>
+              <li><span><Icon n="trend" size={16} /></span>Chaque vente, à la minute près</li>
+              <li><span><Icon n="lock" size={16} /></span>Une caisse comptée à l'aveugle</li>
+              <li><span><Icon n="users" size={16} /></span>Les présences, la paie, les rappels</li>
+            </ul>
           </div>
         </>
       )}
@@ -107,6 +116,7 @@ function Owner({ back }: { back: () => void }) {
   return (
     <div class="stack">
       <button class="link" onClick={back}><Icon n="left" size={16} /> Retour</button>
+      <h2>Espace propriétaire</h2>
       <div class="seg"><button aria-pressed={tab === 'new'} onClick={() => setTab('new')}>Créer mon commerce</button><button aria-pressed={tab === 'login'} onClick={() => setTab('login')}>Se connecter</button></div>
       {tab === 'new' && (
         <>
@@ -160,7 +170,7 @@ function Join({ back }: { back: () => void }) {
   return (
     <div class="stack">
       <button class="link" onClick={back}><Icon n="left" size={16} /> Retour</button>
-      <h1 style={{ fontSize: '24px', marginTop: 0 }}>Rejoindre le commerce</h1>
+      <h2>Rejoindre le commerce</h2>
       <p class="muted">Le propriétaire vous donne un code à 6 caractères (dans son appli : Plus, Réglages).</p>
       <Field label="Code du commerce"><input id="j-code" class="inp num big" autoCapitalize="characters" maxLength={6} value={code} onInput={e => setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} placeholder="AB12CD" /></Field>
       <div class="grid2">

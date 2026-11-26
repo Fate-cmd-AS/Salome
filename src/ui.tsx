@@ -37,6 +37,11 @@ export function Icon({ n, size = 22 }: { n: string; size?: number }) {
   return <svg class="ic" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICONS[n] ?? '' }} />;
 }
 
+/** Formes rondes décoratives du haut des écrans d'accueil, avec le logo. */
+export const Deco = ({ sm }: { sm?: boolean }) => (
+  <div class={'deco' + (sm ? ' sm' : '')} aria-hidden="true"><i class="d1" /><i class="d2" /><span class="logo">S</span></div>
+);
+
 export const Money = ({ v, cls = '' }: { v: number; cls?: string }) => <span class={'num ' + cls}>{fmt(v)}&nbsp;F</span>;
 
 export function MethodBadge({ m }: { m: PayMethod }) {

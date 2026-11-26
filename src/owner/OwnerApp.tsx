@@ -97,7 +97,7 @@ function Home({ alerts, go }: { alerts: Alert[]; go: (t: string, ref?: string) =
       </div>
 
       <button class="card score btnrow" onClick={() => go('alertes')}>
-        <div class="ring" style={{ '--p': score, '--c': score >= 80 ? 'var(--accent)' : score >= 60 ? 'var(--warn)' : 'var(--danger)' } as any}><span>{score}</span></div>
+        <div class="ring" style={{ '--p': score, '--c': score >= 80 ? 'var(--ok)' : score >= 60 ? 'var(--warn)' : 'var(--danger)' } as any}><span>{score}</span></div>
         <div class="main">
           <div class="ttl">Indice de confiance sur 7 jours</div>
           <div class="sub">{high.length ? `${high.length} alerte${high.length > 1 ? 's' : ''} importante${high.length > 1 ? 's' : ''}` : 'Rien de grave'}{pendingExp.length ? ` · ${pendingExp.length} dépense${pendingExp.length > 1 ? 's' : ''} à valider` : ''}</div>

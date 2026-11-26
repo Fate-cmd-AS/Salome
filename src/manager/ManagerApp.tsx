@@ -65,7 +65,7 @@ function Home({ go }: { go: (t: Tab) => void }) {
           <div class="card list">
             {mine.map(r => (
               <div class="row" key={r.id}>
-                <span class="mico" style={{ background: 'var(--accent)' }}><Icon n="bell" size={16} /></span>
+                <span class="mico lime"><Icon n="bell" size={16} /></span>
                 <div class="main"><div class="ttl wrap">{r.text}</div><div class="sub">{time(r.at)}{r.due ? ` · pour ${r.due === t ? "aujourd'hui" : r.due}` : ''}</div></div>
                 {!r.ackAt ? <button class="btn sm" onClick={() => ackReminder(r.id)}>J'ai lu</button>
                   : <button class="btn sm pri" onClick={() => { ackReminder(r.id, true); toast('Le propriétaire est prévenu'); }}>C'est fait</button>}

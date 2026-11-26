@@ -6,7 +6,7 @@ import { Welcome } from './Welcome';
 import { startSync, signOutAll } from './sync';
 import { OwnerApp } from './owner/OwnerApp';
 import { ManagerApp } from './manager/ManagerApp';
-import { Toaster, Icon } from './ui';
+import { Toaster, Icon, Deco } from './ui';
 import type { Person } from './types';
 
 function Login() {
@@ -27,9 +27,10 @@ function Login() {
   };
   return (
     <div class="login">
-      <div class="brand"><span class="logo">S</span>Salomé</div>
-      <h1>Votre commerce, vu de loin, en toute confiance.</h1>
-      <p class="muted">{s.business.name} · {s.business.district}, {s.business.city}</p>
+      <Deco sm={!!who} />
+      <div class="brand">Salomé</div>
+      {!who && <h1>Qui utilise ce téléphone ?</h1>}
+      <p class="lead">{s.business.name} · {s.business.district}, {s.business.city}</p>
       {!who ? (
         <div class="who">
           {users.map(u => (
